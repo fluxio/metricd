@@ -1,0 +1,35 @@
+// This is a definition of a Protobuf schema for the metricd metrics.
+//
+// Protobuf is a binary (de-)serialization and RPC mechanism not unlike Facebook's
+// Thrift, ASN.1, Apache Avro. Given a service and data definition (this file for
+// example), Protobuf compiler would generate RPC-layer code for the server and
+// a client (see server.go and client.go). In addition the data serializer and
+// de-serializer are generated (ttypes.go).
+
+syntax = "proto3";
+
+package pb;
+
+message Error {
+  string message = 1;
+}
+
+enum Agg {
+  SUM = 0;
+}
+
+message Metric {
+  string name = 1;
+  map<string, string> labels = 2;
+  int64 ts = 3;
+  repeated Agg aggregations = 4;
+  oneof Value {
+    int64 int_value = 10;
+    double double_value = 11;
+    string string_value = 12;
+  }
+}
+
+service Server {
+  rpc Report(stream Metric) returns (stream Error) {}
+}
