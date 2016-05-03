@@ -31,14 +31,17 @@ var _ = math.Inf
 type Agg int32
 
 const (
-	Agg_SUM Agg = 0
+	Agg_SUM  Agg = 0
+	Agg_HIST Agg = 1
 )
 
 var Agg_name = map[int32]string{
 	0: "SUM",
+	1: "HIST",
 }
 var Agg_value = map[string]int32{
-	"SUM": 0,
+	"SUM":  0,
+	"HIST": 1,
 }
 
 func (x Agg) String() string {
@@ -57,7 +60,7 @@ type Metric struct {
 	Name         string            `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Labels       map[string]string `protobuf:"bytes,2,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Ts           int64             `protobuf:"varint,3,opt,name=ts" json:"ts,omitempty"`
-	Aggregations []Agg             `protobuf:"varint,4,rep,name=aggregations,enum=metricd.Agg" json:"aggregations,omitempty"`
+	Aggregations []Agg             `protobuf:"varint,4,rep,name=aggregations,enum=pb.Agg" json:"aggregations,omitempty"`
 	// Types that are valid to be assigned to Value:
 	//	*Metric_IntValue
 	//	*Metric_DoubleValue
@@ -181,9 +184,9 @@ func _Metric_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer)
 }
 
 func init() {
-	proto.RegisterType((*Error)(nil), "metricd.Error")
-	proto.RegisterType((*Metric)(nil), "metricd.Metric")
-	proto.RegisterEnum("metricd.Agg", Agg_name, Agg_value)
+	proto.RegisterType((*Error)(nil), "pb.Error")
+	proto.RegisterType((*Metric)(nil), "pb.Metric")
+	proto.RegisterEnum("pb.Agg", Agg_name, Agg_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -205,7 +208,7 @@ func NewServerClient(cc *grpc.ClientConn) ServerClient {
 }
 
 func (c *serverClient) Report(ctx context.Context, opts ...grpc.CallOption) (Server_ReportClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_Server_serviceDesc.Streams[0], c.cc, "/metricd.Server/Report", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_Server_serviceDesc.Streams[0], c.cc, "/pb.Server/Report", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +275,7 @@ func (x *serverReportServer) Recv() (*Metric, error) {
 }
 
 var _Server_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "metricd.Server",
+	ServiceName: "pb.Server",
 	HandlerType: (*ServerServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{

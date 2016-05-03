@@ -47,9 +47,9 @@ func (t *timer) Pause() {
 func (t *timer) End() error {
 	if !t.startedTs.IsZero() || t.accumulated != 0 {
 		t.Pause()
-		runLenMs := t.accumulated.Nanoseconds() / 1e6
+		runLenUs := t.accumulated.Nanoseconds() / 1e3
 		t.accumulated = 0
-		return t.client.Report(t.name, t.labels, runLenMs)
+		return t.client.ReportHistogram(t.name, t.labels, runLenUs)
 	}
 	return nil
 }
