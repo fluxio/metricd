@@ -9,19 +9,31 @@ import (
 	"github.com/fluxio/metricd/pb"
 )
 
+const LOWEST_VALUE = 0
+const HIGHEST_VALUE = 1e7
+
+// HdrHistogram doesn't store the values precisely, instead it maintains
+// counts with a number of digits of precision requested.
+const DIGITS_OF_PRECISION = 2
+
 type histAggregator struct {
 	name   string
 	labels metricd.LabelSet
-	h      *hdrhistogram.Histogram
+	// usec.
+	// Initialized lazily in AddValue().
+	h *hdrhistogram.Histogram
 }
 
 func (a *histAggregator) AddValue(value float64, ts int64) {
+	if a.h == nil {
+		a.h = hdrhistogram.New(LOWEST_VALUE, HIGHEST_VALUE, DIGITS_OF_PRECISION)
+	}
 	a.h.RecordValue(int64(value))
 }
 
 func (a *histAggregator) GetAggregations() []*pb.Metric {
-	if a.h.TotalCount() != 0 {
-		var res []*pb.Metric
+	var res []*pb.Metric
+	if a.h != nil && a.h.TotalCount() != 0 {
 		for _, q := range []float64{0, 50, 90, 95, 99, 100} {
 			res = append(res, &pb.Metric{
 				Name:   a.name + "_p" + strconv.Itoa(int(q)),
@@ -30,15 +42,15 @@ func (a *histAggregator) GetAggregations() []*pb.Metric {
 				Ts:     time.Now().Unix(),
 			})
 		}
-		a.h = hdrhistogram.New(0, 1e8, 3)
+		// No point of keeping an empty histogram around, it can be large.
+		a.h = nil
 	}
-	return []*pb.Metric{}
+	return res
 }
 
 func NewHistAggregator(name string, labels metricd.LabelSet) aggregatorUnit {
 	return &histAggregator{
 		name:   name,
 		labels: labels,
-		h:      hdrhistogram.New(0, 1e8, 3), // usec
 	}
 }
