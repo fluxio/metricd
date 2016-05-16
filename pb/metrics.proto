@@ -16,6 +16,7 @@ message Error {
 
 enum Agg {
   SUM = 0;
+  HIST = 1;
 }
 
 message Metric {

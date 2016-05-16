@@ -54,6 +54,9 @@ type Client interface {
 	// suffix. Negative values and zeroes are allowed.
 	ReportSum(name string, labels LabelSet, value interface{}) error
 
+	// The reported values are recorded in a histogram over a set period.
+	ReportHistogram(name string, labels LabelSet, value interface{}) error
+
 	// Returns a timer instance, which can be used for reporting time
 	// length metrics.
 	Timer(name string, labels LabelSet) Timer
@@ -129,6 +132,14 @@ func (c *realClient) ReportSum(
 	value interface{},
 ) error {
 	return c.submit(name, labels, value, []pb.Agg{pb.Agg(pb.Agg_value["SUM"])})
+}
+
+func (c *realClient) ReportHistogram(
+	name string,
+	labels LabelSet,
+	value interface{},
+) error {
+	return c.submit(name, labels, value, []pb.Agg{pb.Agg(pb.Agg_value["HIST"])})
 }
 
 func (c *realClient) submit(
@@ -248,6 +259,13 @@ func (nopClient) Report(
 	return nil
 }
 func (nopClient) ReportSum(
+	name string,
+	labels LabelSet,
+	value interface{},
+) error {
+	return nil
+}
+func (nopClient) ReportHistogram(
 	name string,
 	labels LabelSet,
 	value interface{},

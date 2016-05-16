@@ -1,11 +1,13 @@
 package server
 
 import (
+	"time"
+
 	"github.com/fluxio/metricd"
 	"github.com/fluxio/metricd/pb"
+	"github.com/streamrail/concurrent-map"
 
 	"math"
-	"time"
 )
 
 // Each metric may optionally specify one or more aggregations to be applied to
@@ -21,11 +23,16 @@ import (
 // originally reported with only the cumulative value.
 
 // Creates an instance of the aggregator, with in and out channels.
-func NewAggregator(in chan *pb.Metric, out chan *pb.Metric) *aggregator {
+func NewAggregator(
+	in chan *pb.Metric,
+	out chan *pb.Metric,
+	submissionCadence time.Duration,
+) *aggregator {
 	return &aggregator{
-		in:    in,
-		out:   out,
-		arena: make(map[string]float64),
+		in:      in,
+		out:     out,
+		state:   cmap.New(),
+		cadence: submissionCadence,
 	}
 }
 
@@ -35,6 +42,8 @@ func NewAggregator(in chan *pb.Metric, out chan *pb.Metric) *aggregator {
 // additional metrics may  be emitted to the `out` channel. Also the original
 // metric might be duplicated to `out`.
 func (a *aggregator) Run() {
+	go a.submitter()
+
 	for m := range a.in {
 		for _, out_m := range a.process(m) {
 			a.out <- out_m
@@ -46,10 +55,16 @@ type aggregator struct {
 	in  chan *pb.Metric
 	out chan *pb.Metric
 
-	arena map[string]float64
+	state   cmap.ConcurrentMap
+	cadence time.Duration
 }
 
-func arenaKey(n string, l metricd.LabelSet) string {
+type aggregatorUnit interface {
+	AddValue(value float64, ts int64)
+	GetAggregations() []*pb.Metric
+}
+
+func stateKey(n string, l metricd.LabelSet) string {
 	res := n
 	for k, v := range l {
 		res += "!" + k + "!" + v
@@ -57,25 +72,50 @@ func arenaKey(n string, l metricd.LabelSet) string {
 	return res
 }
 
+func (a *aggregator) submitter() {
+	tick := time.NewTicker(a.cadence)
+
+	for range tick.C {
+		for t := range a.state.Iter() {
+			for _, m := range t.Val.(aggregatorUnit).GetAggregations() {
+				a.out <- m
+			}
+		}
+	}
+}
+
 func (a *aggregator) process(m *pb.Metric) []*pb.Metric {
+	emitOriginal := true
 	var res []*pb.Metric
 	for _, agg := range m.Aggregations {
-		if agg == pb.Agg_SUM {
-			val := m.ValueAsFloat()
-			if !math.IsNaN(val) {
-				p := arenaKey(m.Name, m.Labels)
-				a.arena[p] += val
-				new_m := &pb.Metric{
-					Name:   m.Name + "_sum",
-					Labels: m.Labels,
-					Value:  &pb.Metric_DoubleValue{a.arena[p]},
-					Ts:     time.Now().UTC().Unix(),
+		// Don't emit original metric if there is an aggregation.
+		emitOriginal = false
+
+		val := m.ValueAsFloat()
+		if !math.IsNaN(val) {
+			p := stateKey(m.Name, m.Labels)
+			u, exists := a.state.Get(p)
+
+			if agg == pb.Agg_HIST {
+				if !exists {
+					u = NewHistAggregator(m.Name, m.Labels)
+					a.state.Set(p, u)
 				}
-				res = append(res, new_m)
+				u.(aggregatorUnit).AddValue(val, m.Ts)
+			}
+
+			if agg == pb.Agg_SUM {
+				if !exists {
+					u = NewSumAggregator(m.Name, m.Labels)
+					a.state.Set(p, u)
+				}
+				u.(aggregatorUnit).AddValue(val, m.Ts)
 			}
 		}
 	}
 
-	// Return the original metric by default.
-	return append(res, m)
+	if emitOriginal {
+		res = append(res, m)
+	}
+	return res
 }
