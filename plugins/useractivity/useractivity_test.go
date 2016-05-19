@@ -67,8 +67,9 @@ func TestActivtiesAndClients(t *testing.T) {
 	Convey("Activities are tracked properly", t, func() {
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test1",
-			Labels: metricd.LabelSet{"id": "1", "clientType": "web"},
+			Labels: metricd.LabelSet{"id": "1", "type": "test1", "clientType": "web"},
 		}
+
 		session1metric1 := <-out
 		val, exists := r.sessions.Get(session1metric1.Labels["id"])
 
@@ -78,9 +79,11 @@ func TestActivtiesAndClients(t *testing.T) {
 
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test2",
-			Labels: metricd.LabelSet{"id": "1", "clientType": "web"},
+			Labels: metricd.LabelSet{"id": "1", "type": "test2", "clientType": "web"},
 		}
+
 		session1metric2 := <-out
+
 		val, exists = r.sessions.Get(session1metric2.Labels["id"])
 
 		So(exists, ShouldBeTrue)
@@ -89,8 +92,9 @@ func TestActivtiesAndClients(t *testing.T) {
 
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test3",
-			Labels: metricd.LabelSet{"id": "1", "clientType": "web"},
+			Labels: metricd.LabelSet{"id": "1", "type": "test3", "clientType": "web"},
 		}
+
 		session1metric3 := <-out
 		val, exists = r.sessions.Get(session1metric3.Labels["id"])
 
@@ -104,7 +108,7 @@ func TestActivtiesAndClients(t *testing.T) {
 	Convey("Clients are tracked properly", t, func() {
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test1",
-			Labels: metricd.LabelSet{"id": "1", "clientType": "web"},
+			Labels: metricd.LabelSet{"id": "1", "type": "test1", "clientType": "web"},
 		}
 		session2metric1 := <-out
 		val, exists := r.sessions.Get(session2metric1.Labels["id"])
@@ -115,7 +119,7 @@ func TestActivtiesAndClients(t *testing.T) {
 
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test1",
-			Labels: metricd.LabelSet{"id": "1", "clientType": "revit"},
+			Labels: metricd.LabelSet{"id": "1", "type": "test1", "clientType": "revit"},
 		}
 		session2metric2 := <-out
 		val, exists = r.sessions.Get(session2metric2.Labels["id"])
@@ -126,7 +130,7 @@ func TestActivtiesAndClients(t *testing.T) {
 
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test2",
-			Labels: metricd.LabelSet{"id": "1", "clientType": "grasshopper"},
+			Labels: metricd.LabelSet{"id": "1", "type": "test2", "clientType": "grasshopper"},
 		}
 		session2metric3 := <-out
 		val, exists = r.sessions.Get(session2metric3.Labels["id"])
