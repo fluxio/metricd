@@ -128,7 +128,7 @@ func (r *reporter) submitter() {
 			func() {
 				val, exists := r.sessions.Get(key)
 				if !exists {
-					logging.Errorf("Atempting to delete a nonexisting session for %s", key)
+					logging.Errorf("Attempting to delete a nonexisting session for %s", key)
 					return
 				}
 				s := val.(session)
