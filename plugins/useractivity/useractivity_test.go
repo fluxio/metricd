@@ -74,8 +74,8 @@ func TestActivtiesAndClients(t *testing.T) {
 		val, exists := r.sessions.Get(session1metric1.Labels["id"])
 
 		So(exists, ShouldBeTrue)
-		So(val.(session).activities, ShouldResemble, map[string]bool{"test1": true})
-		So(val.(session).clients, ShouldResemble, map[string]bool{"web": true})
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true})
+		So(val.(*session).clients, ShouldResemble, map[string]bool{"web": true})
 
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test2",
@@ -87,8 +87,8 @@ func TestActivtiesAndClients(t *testing.T) {
 		val, exists = r.sessions.Get(session1metric2.Labels["id"])
 
 		So(exists, ShouldBeTrue)
-		So(val.(session).activities, ShouldResemble, map[string]bool{"test1": true, "test2": true})
-		So(val.(session).clients, ShouldResemble, map[string]bool{"web": true})
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true, "test2": true})
+		So(val.(*session).clients, ShouldResemble, map[string]bool{"web": true})
 
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test3",
@@ -99,8 +99,8 @@ func TestActivtiesAndClients(t *testing.T) {
 		val, exists = r.sessions.Get(session1metric3.Labels["id"])
 
 		So(exists, ShouldBeTrue)
-		So(val.(session).activities, ShouldResemble, map[string]bool{"test1": true, "test2": true, "test3": true})
-		So(val.(session).clients, ShouldResemble, map[string]bool{"web": true})
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true, "test2": true, "test3": true})
+		So(val.(*session).clients, ShouldResemble, map[string]bool{"web": true})
 
 		<-segmentCh
 	})
@@ -114,8 +114,8 @@ func TestActivtiesAndClients(t *testing.T) {
 		val, exists := r.sessions.Get(session2metric1.Labels["id"])
 
 		So(exists, ShouldBeTrue)
-		So(val.(session).activities, ShouldResemble, map[string]bool{"test1": true})
-		So(val.(session).clients, ShouldResemble, map[string]bool{"web": true})
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true})
+		So(val.(*session).clients, ShouldResemble, map[string]bool{"web": true})
 
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test1",
@@ -125,8 +125,8 @@ func TestActivtiesAndClients(t *testing.T) {
 		val, exists = r.sessions.Get(session2metric2.Labels["id"])
 
 		So(exists, ShouldBeTrue)
-		So(val.(session).activities, ShouldResemble, map[string]bool{"test1": true})
-		So(val.(session).clients, ShouldResemble, map[string]bool{"web": true, "revit": true})
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true})
+		So(val.(*session).clients, ShouldResemble, map[string]bool{"web": true, "revit": true})
 
 		in <- &pb.Metric{
 			Name:   analyticsMetricPrefix + "test2",
@@ -136,8 +136,44 @@ func TestActivtiesAndClients(t *testing.T) {
 		val, exists = r.sessions.Get(session2metric3.Labels["id"])
 
 		So(exists, ShouldBeTrue)
-		So(val.(session).activities, ShouldResemble, map[string]bool{"test1": true, "test2": true})
-		So(val.(session).clients, ShouldResemble, map[string]bool{"web": true, "revit": true, "grasshopper": true})
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true, "test2": true})
+		So(val.(*session).clients, ShouldResemble, map[string]bool{"web": true, "revit": true, "grasshopper": true})
+
+		<-segmentCh
+	})
+	Convey("Projects are tracked properly", t, func() {
+		in <- &pb.Metric{
+			Name:   analyticsMetricPrefix + "test1",
+			Labels: metricd.LabelSet{"id": "1", "type": "test1", "prj": "abc"},
+		}
+		session2metric1 := <-out
+		val, exists := r.sessions.Get(session2metric1.Labels["id"])
+
+		So(exists, ShouldBeTrue)
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true})
+		So(val.(*session).projects, ShouldResemble, map[string]bool{"abc": true})
+
+		in <- &pb.Metric{
+			Name:   analyticsMetricPrefix + "test1",
+			Labels: metricd.LabelSet{"id": "1", "type": "test1", "prj": "foo"},
+		}
+		session2metric2 := <-out
+		val, exists = r.sessions.Get(session2metric2.Labels["id"])
+
+		So(exists, ShouldBeTrue)
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true})
+		So(val.(*session).projects, ShouldResemble, map[string]bool{"abc": true, "foo": true})
+
+		in <- &pb.Metric{
+			Name:   analyticsMetricPrefix + "test2",
+			Labels: metricd.LabelSet{"id": "1", "type": "test2", "prj": "bar"},
+		}
+		session2metric3 := <-out
+		val, exists = r.sessions.Get(session2metric3.Labels["id"])
+
+		So(exists, ShouldBeTrue)
+		So(val.(*session).activities, ShouldResemble, map[string]bool{"test1": true, "test2": true})
+		So(val.(*session).projects, ShouldResemble, map[string]bool{"abc": true, "foo": true, "bar": true})
 
 		<-segmentCh
 	})

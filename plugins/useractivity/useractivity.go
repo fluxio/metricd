@@ -60,7 +60,7 @@ func (r *reporter) injectSegmentClient(c segmentClient) {
 	r.c = c
 }
 
-func (r *reporter) submit(uid string, s session) {
+func (r *reporter) submit(uid string, s *session) {
 	length := math.Floor(s.lastAct.Sub(s.start).Seconds())
 
 	t := &analytics.Track{
@@ -91,6 +91,8 @@ func (r *reporter) submitter() {
 	// Set up the ticker.
 	tick := time.NewTicker(freq)
 
+	var tickTime time.Time
+	toRemove := []string{}
 	// Will execute every tick.
 	for range tick.C {
 		// When sessions come out of the window, we want to remove them from
@@ -110,11 +112,11 @@ func (r *reporter) submitter() {
 		// channel, and the loop body contains a Remove call (which acquires the
 		// shard's mutex), we deadlock.
 		//
-		tickTime := time.Now()
-		toRemove := []string{}
+		tickTime = time.Now()
+		toRemove = toRemove[:0]
 		for t := range r.sessions.Iter() {
 			func() {
-				s := t.Val.(session)
+				s := t.Val.(*session)
 				// Session ran out of the window?
 				s.mut.Lock()
 				defer s.mut.Unlock()
@@ -131,7 +133,7 @@ func (r *reporter) submitter() {
 					logging.Errorf("Attempting to delete a nonexisting session for %s", key)
 					return
 				}
-				s := val.(session)
+				s := val.(*session)
 				s.mut.Lock()
 				defer s.mut.Unlock()
 				if s.lastAct.Add(r.window).Before(tickTime) {
@@ -167,9 +169,9 @@ func (r *reporter) record(m *pb.Metric) *pb.Metric {
 	// get that functionality in and will update the code.
 	val, exists := r.sessions.Get(uid)
 	now := time.Now()
-	var s session
+	var s *session
 	if !exists {
-		s = session{
+		s = &session{
 			start:         now,
 			lastAct:       now,
 			id:            getBase64UniqueId(),
@@ -179,7 +181,7 @@ func (r *reporter) record(m *pb.Metric) *pb.Metric {
 			projects:      map[string]bool{},
 		}
 	} else {
-		s = val.(session)
+		s = val.(*session)
 	}
 
 	// Note: At this point, it may have been removed from the map already, but we
