@@ -5,18 +5,18 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/fluxio/metricd/pb"
 	"github.com/fluxio/logging"
-
+	"github.com/fluxio/metricd/pb"
 	"github.com/segmentio/analytics-go"
 	"github.com/streamrail/concurrent-map"
 	"github.com/xtgo/uuid"
 )
 
 var freq = 10 * time.Second
-var activityDefinitionVer = "v1"
+var activityDefinitionVer = 2
 
 const analyticsMetricPrefix = "head_proxy.analytics."
 
@@ -36,11 +36,16 @@ type reporter struct {
 }
 
 type session struct {
-	start      time.Time
-	lastAct    time.Time
-	id         string
-	activities map[string]bool
-	clients    map[string]bool
+	start         time.Time
+	lastAct       time.Time
+	id            string
+	activityCount int64
+	activities    map[string]bool
+	clients       map[string]bool
+	projects      map[string]bool
+
+	// This mutex synchronizes access to all fields.
+	mut sync.Mutex
 }
 
 var analyticsContext = map[string]interface{}{
@@ -55,7 +60,7 @@ func (r *reporter) injectSegmentClient(c segmentClient) {
 	r.c = c
 }
 
-func (r *reporter) submit(uid string, s session) {
+func (r *reporter) submit(uid string, s *session) {
 	length := math.Floor(s.lastAct.Sub(s.start).Seconds())
 
 	t := &analytics.Track{
@@ -63,13 +68,15 @@ func (r *reporter) submit(uid string, s session) {
 		UserId:  uid,
 		Context: analyticsContext,
 		Properties: map[string]interface{}{
-			"Start":      s.start,
-			"Duration":   length,
-			"Ver":        activityDefinitionVer,
-			"Build":      r.build,
-			"SessionId":  s.id,
-			"Activities": convertMapKeysToArray(s.activities),
-			"Clients":    convertMapKeysToArray(s.clients),
+			"Start":         s.start,
+			"Duration":      length,
+			"Ver":           activityDefinitionVer,
+			"Build":         r.build,
+			"SessionId":     s.id,
+			"ActivityCount": s.activityCount,
+			"Activities":    convertMapKeysToArray(s.activities),
+			"Clients":       convertMapKeysToArray(s.clients),
+			"Projects":      convertMapKeysToArray(s.projects),
 		},
 	}
 	t.Message.Timestamp = s.lastAct.String()
@@ -84,6 +91,8 @@ func (r *reporter) submitter() {
 	// Set up the ticker.
 	tick := time.NewTicker(freq)
 
+	var tickTime time.Time
+	toRemove := []string{}
 	// Will execute every tick.
 	for range tick.C {
 		// When sessions come out of the window, we want to remove them from
@@ -103,22 +112,35 @@ func (r *reporter) submitter() {
 		// channel, and the loop body contains a Remove call (which acquires the
 		// shard's mutex), we deadlock.
 		//
-		toRemove := []string{}
+		tickTime = time.Now()
+		toRemove = toRemove[:0]
 		for t := range r.sessions.Iter() {
-			s := t.Val.(session)
-			// Session ran out of the window?
-			if s.lastAct.Add(r.window).Before(time.Now()) {
-				toRemove = append(toRemove, t.Key)
-			}
+			func() {
+				s := t.Val.(*session)
+				// Session ran out of the window?
+				s.mut.Lock()
+				defer s.mut.Unlock()
+				if s.lastAct.Add(r.window).Before(tickTime) {
+					toRemove = append(toRemove, t.Key)
+				}
+			}()
 		}
 
 		for _, key := range toRemove {
-			val, exists := r.sessions.Get(key)
-			if !exists {
-				logging.Errorf("Atempting to delete a nonexisting session for %s", key)
-			}
-			r.sessions.Remove(key)
-			r.submit(key, val.(session))
+			func() {
+				val, exists := r.sessions.Get(key)
+				if !exists {
+					logging.Errorf("Attempting to delete a nonexisting session for %s", key)
+					return
+				}
+				s := val.(*session)
+				s.mut.Lock()
+				defer s.mut.Unlock()
+				if s.lastAct.Add(r.window).Before(tickTime) {
+					r.sessions.Remove(key)
+					r.submit(key, s)
+				}
+			}()
 		}
 	}
 }
@@ -147,21 +169,45 @@ func (r *reporter) record(m *pb.Metric) *pb.Metric {
 	// get that functionality in and will update the code.
 	val, exists := r.sessions.Get(uid)
 	now := time.Now()
-	var s session
+	var s *session
 	if !exists {
-		s = session{now, now, getBase64UniqueId(), map[string]bool{},
-			map[string]bool{}}
+		s = &session{
+			start:         now,
+			lastAct:       now,
+			id:            getBase64UniqueId(),
+			activityCount: 0,
+			activities:    map[string]bool{},
+			clients:       map[string]bool{},
+			projects:      map[string]bool{},
+		}
 	} else {
-		s = val.(session)
+		s = val.(*session)
 	}
-	s.lastAct = now
 
-	s.activities[strings.TrimPrefix(m.Name, analyticsMetricPrefix)] = true
-	s.clients[m.Labels["clientType"]] = true
+	// Note: At this point, it may have been removed from the map already, but we
+	//       are going to ignore that possibility to avoid having to keep track of
+	//       sent vs unsent.
+	sid := func() string {
+		s.mut.Lock()
+		defer s.mut.Unlock()
+
+		s.lastAct = now
+
+		s.activityCount++
+		s.activities[m.Labels["type"]] = true
+		s.clients[m.Labels["clientType"]] = true
+
+		if prjid, ok := m.Labels["prj"]; ok {
+			s.projects[prjid] = true
+		}
+
+		return s.id
+
+	}()
 
 	r.sessions.Set(uid, s)
 
-	m.Labels["sessionId"] = s.id
+	m.Labels["sessionId"] = sid
 
 	return m
 }
@@ -208,7 +254,9 @@ func NewUserActivityReporter(
 	outputChannel chan *pb.Metric,
 	segmentioToken string,
 	window time.Duration,
-	dockerBuild string) *reporter {
+	dockerBuild string,
+) *reporter {
+
 	c := analytics.New(segmentioToken)
 	c.Client = http.Client{Timeout: time.Duration(30 * time.Second)}
 
