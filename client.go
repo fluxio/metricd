@@ -10,9 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fluxio/metricd/pb"
-
 	"github.com/fluxio/logging"
+	"github.com/fluxio/metricd/pb"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -175,9 +174,10 @@ func (c *realClient) submit(
 	// FIXME(fwd): Drop older metrics instead of the newer ones.
 	select {
 	case c.metrics <- m:
-		// Unset the "buffer full" flag if it's set.
-		if atomic.CompareAndSwapInt32(&c.bufferFull, 1, 0) {
-			logging.Info("Metric buffer no longer full, reporting metrics.")
+		// Wait until the queue drops to normal levels before reporting that
+		// reporting is back online. Then unset the "buffer full" flag if it's set.
+		if len(c.metrics) < normalQueueSize && atomic.CompareAndSwapInt32(&c.bufferFull, 1, 0) {
+			logging.Info("Metricd buffer has returned to a normal level.")
 		}
 	default:
 		msg := "Metric buffer is full, dropping metrics."

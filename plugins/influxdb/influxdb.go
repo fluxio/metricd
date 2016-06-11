@@ -4,10 +4,11 @@ package influxdb
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
-	"github.com/fluxio/metricd/pb"
 	"github.com/fluxio/logging"
+	"github.com/fluxio/metricd/pb"
 
 	"github.com/influxdb/influxdb/client"
 )
@@ -77,8 +78,15 @@ func (i *InfluxDb) sendToInfluxDb(p client.Point) error {
 	}
 	_, err := i.client.Write(bps)
 	if err != nil {
-		logging.Errorf("Error sending value to InfluxDb: %s", err)
-		i.client = nil // Force reconnect.
+		if strings.Contains(err.Error(), "field type conflict") {
+			logging.Errorf("Field Type Conflict writing to Influxdb. %s", err.Error())
+		} else {
+			logging.Errorf(
+				"Error sending value to InfluxDb: %s. Forcing Reconnection.",
+				err.Error(),
+			)
+			i.client = nil // Force reconnect.
+		}
 	}
 	return err
 }
