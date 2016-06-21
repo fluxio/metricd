@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fluxio/metricd/pb"
 	"github.com/fluxio/logging"
+	"github.com/fluxio/metricd/pb"
 
 	"github.com/marpaia/graphite-golang"
 )
@@ -139,7 +139,11 @@ func (g *Graphite) Run() {
 	go g.flusher()
 
 	for m := range g.Metrics {
-		g.sendToGraphite(buildGraphiteName(m), m.ValueAsString(), m.Ts)
+		g.sendToGraphite(
+			buildGraphiteName(m),
+			m.ValueAsString(),
+			m.Ts/int64(time.Second/time.Nanosecond), /* Convert nanoseconds to seconds */
+		)
 	}
 }
 

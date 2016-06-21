@@ -39,7 +39,7 @@ func (a *histAggregator) GetAggregations() []*pb.Metric {
 				Name:   a.name + "_p" + strconv.Itoa(int(q)),
 				Labels: a.labels,
 				Value:  &pb.Metric_DoubleValue{float64(a.h.ValueAtQuantile(q))},
-				Ts:     time.Now().Unix(),
+				Ts:     time.Now().UnixNano(),
 			})
 		}
 		// No point of keeping an empty histogram around, it can be large.
