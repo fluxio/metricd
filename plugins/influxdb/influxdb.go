@@ -98,7 +98,7 @@ func buildPoint(m *pb.Metric) client.Point {
 		Fields: map[string]interface{}{
 			"value": m.ValueAsFloat(),
 		},
-		Time: time.Unix(m.Ts, 0),
+		Time: time.Unix(0, m.Ts),
 	}
 }
 

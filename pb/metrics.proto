@@ -22,6 +22,7 @@ enum Agg {
 message Metric {
   string name = 1;
   map<string, string> labels = 2;
+  // Timestamp in nanoseconds since 1970
   int64 ts = 3;
   repeated Agg aggregations = 4;
   oneof Value {

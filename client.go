@@ -150,7 +150,7 @@ func (c *realClient) submit(
 	m := pb.Metric{
 		Name:         name,
 		Labels:       labels,
-		Ts:           time.Now().UTC().Unix(),
+		Ts:           time.Now().UTC().UnixNano(),
 		Aggregations: agg}
 
 	switch v := value.(type) {
