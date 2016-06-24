@@ -59,6 +59,9 @@ type aggregator struct {
 	cadence time.Duration
 }
 
+// Interface that all aggregators must implement. Note that AddValue() and
+// GetAggregations() are called from different goroutines, and thus must be
+// thread-safe with regard to each other.
 type aggregatorUnit interface {
 	AddValue(value float64, ts int64)
 	GetAggregations() []*pb.Metric

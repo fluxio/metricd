@@ -2,6 +2,7 @@ package server
 
 import (
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/codahale/hdrhistogram"
@@ -22,16 +23,30 @@ type histAggregator struct {
 	// usec.
 	// Initialized lazily in AddValue().
 	h *hdrhistogram.Histogram
+	m sync.Mutex
 }
 
 func (a *histAggregator) AddValue(value float64, ts int64) {
+	a.m.Lock()
+	defer a.m.Unlock()
+
 	if a.h == nil {
 		a.h = hdrhistogram.New(LOWEST_VALUE, HIGHEST_VALUE, DIGITS_OF_PRECISION)
 	}
 	a.h.RecordValue(int64(value))
 }
 
+// Outputs:
+//    [metric_name]_0 : Minimum value in the aggregation interval
+//    [metric_name]_50 : Median value in the aggregation interval
+//    [metric_name]_90 : 90th percentile value in the aggregation interval
+//    [metric_name]_95 : 95th percentile value in the aggregation interval
+//    [metric_name]_99 : 99th percentile value in the aggregation interval
+//    [metric_name]_100 : Maximum value in the aggregation interval
 func (a *histAggregator) GetAggregations() []*pb.Metric {
+	a.m.Lock()
+	defer a.m.Unlock()
+
 	var res []*pb.Metric
 	if a.h != nil && a.h.TotalCount() != 0 {
 		for _, q := range []float64{0, 50, 90, 95, 99, 100} {
