@@ -77,16 +77,9 @@ func (c *realClient) tryConnect() error {
 		c.conn.Close()
 	}
 	var err error
-	c.conn, err = grpc.Dial(c.addr.Host, grpc.WithInsecure())
+	c.conn, err = grpc.Dial(c.addr.Host, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return fmt.Errorf("Error creating grpc connection: %s.", err)
-	}
-
-	c.conn.WaitForStateChange(connectionTimeout, grpc.Connecting)
-	if c.conn.State() != grpc.Idle {
-		state := c.conn.State().String()
-		c.conn = nil
-		return fmt.Errorf("Grpc connection failed. State: %s.", state)
 	}
 
 	c.client = pb.NewServerClient(c.conn)
