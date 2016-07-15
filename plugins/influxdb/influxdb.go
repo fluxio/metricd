@@ -9,8 +9,15 @@ import (
 
 	"github.com/fluxio/logging"
 	"github.com/fluxio/metricd/pb"
-
 	"github.com/influxdb/influxdb/client"
+)
+
+var (
+	// Batching configuration
+	// TODO(avaskys): Make this configurable
+	numWorkers = 8
+	batchSize  = 5000
+	batchTime  = 5 * time.Second
 )
 
 // InfluxDb object represents a connection to a InfluxDb server,
@@ -20,18 +27,25 @@ type InfluxDb struct {
 	Metrics chan *pb.Metric
 	// Location of the InfluxDb server.
 	Loc string
+}
+
+type influxdbWorker struct {
+	// A channel which will receive metric batches
+	batches chan []client.Point
+	// Location of the InfluxDb server
+	loc string
 	// Handler to the library client.
 	client *client.Client
 }
 
-func (i *InfluxDb) connect() error {
-	logging.Infof("Initializing InfluxDb Client. Connecting to %s", i.Loc)
+func (w *influxdbWorker) connect() error {
+	logging.Infof("Initializing InfluxDb Client. Connecting to %s", w.loc)
 
-	u, err := url.Parse(fmt.Sprintf("http://%s", i.Loc))
+	u, err := url.Parse(fmt.Sprintf("http://%s", w.loc))
 	if err != nil {
-		logging.Errorf("Illegal influxdb location: %s", i.Loc)
+		logging.Errorf("Illegal influxdb location: %s", w.loc)
 		logging.Info("Using Nop influxdb client.")
-		i.client = nil
+		w.client = nil
 		return nil
 	}
 
@@ -41,23 +55,23 @@ func (i *InfluxDb) connect() error {
 		Password: "data",
 	}
 
-	i.client, err = client.NewClient(conf)
+	w.client, err = client.NewClient(conf)
 
 	return err
 }
 
-func (i *InfluxDb) ensureConnected() {
+func (w *influxdbWorker) ensureConnected() {
 	reconnect_interval := 1 * time.Second
-	for i.client == nil {
-		if err := i.connect(); err != nil {
+	for w.client == nil {
+		if err := w.connect(); err != nil {
 			logging.Errorf("Error connecting to InfluxDb: %s", err)
 		} else { // Check that the connection actually succeeded.
-			if _, _, err = i.client.Ping(); err == nil {
+			if _, _, err = w.client.Ping(); err == nil {
 				logging.Errorf("Connection succeeded.")
 				break
 			}
 			logging.Errorf("Ping failed: %s", err)
-			i.client = nil // Reconnect.
+			w.client = nil // Reconnect.
 		}
 		time.Sleep(reconnect_interval)
 
@@ -69,14 +83,14 @@ func (i *InfluxDb) ensureConnected() {
 	}
 }
 
-func (i *InfluxDb) sendToInfluxDb(p client.Point) error {
-	i.ensureConnected()
+func (w *influxdbWorker) sendToInfluxDb(p []client.Point) error {
+	w.ensureConnected()
 	bps := client.BatchPoints{
-		Points:          []client.Point{p},
+		Points:          p,
 		Database:        "data",
 		RetentionPolicy: "default",
 	}
-	_, err := i.client.Write(bps)
+	_, err := w.client.Write(bps)
 	if err != nil {
 		if strings.Contains(err.Error(), "field type conflict") {
 			logging.Errorf("Field Type Conflict writing to Influxdb. %s", err.Error())
@@ -85,10 +99,16 @@ func (i *InfluxDb) sendToInfluxDb(p client.Point) error {
 				"Error sending value to InfluxDb: %s. Forcing Reconnection.",
 				err.Error(),
 			)
-			i.client = nil // Force reconnect.
+			w.client = nil // Force reconnect.
 		}
 	}
 	return err
+}
+
+func (w *influxdbWorker) run() {
+	for batch := range w.batches {
+		w.sendToInfluxDb(batch)
+	}
 }
 
 func buildPoint(m *pb.Metric) client.Point {
@@ -103,8 +123,42 @@ func buildPoint(m *pb.Metric) client.Point {
 }
 
 func (i *InfluxDb) Run() {
-	for m := range i.Metrics {
-		i.sendToInfluxDb(buildPoint(m))
+	batchChan := make(chan []client.Point, numWorkers)
+
+	// Start our workers
+	for worker := 0; worker < numWorkers; worker++ {
+		worker := influxdbWorker{
+			batches: batchChan,
+			loc:     i.Loc,
+		}
+		go worker.run()
+	}
+
+	// Start batching metrics
+	var curBatch []client.Point
+	ticker := time.NewTicker(batchTime)
+	for {
+		if curBatch == nil {
+			// Optimize for the case where we're receiving lots of metrics. So
+			// pre-allocate the full batch size.
+			curBatch = make([]client.Point, 0, batchSize)
+		}
+
+		// Send a batch when we reach batchSize or when our timer expires,
+		// whichever comes first.
+		select {
+		case m := <-i.Metrics:
+			curBatch = append(curBatch, buildPoint(m))
+			if len(curBatch) == batchSize {
+				batchChan <- curBatch
+				curBatch = nil
+			}
+		case <-ticker.C:
+			if len(curBatch) > 0 {
+				batchChan <- curBatch
+				curBatch = nil
+			}
+		}
 	}
 }
 

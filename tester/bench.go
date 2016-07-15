@@ -32,7 +32,7 @@ func write(inst int) {
 	go func() {
 		for range tick.C {
 			m.Lock()
-			fmt.Printf("Metrics sent: %d\r", c)
+			fmt.Printf("Metrics sent: %d\n", c)
 			c = 0
 			m.Unlock()
 		}
