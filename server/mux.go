@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/fluxio/metricd/pb"
 	"github.com/fluxio/logging"
+	"github.com/fluxio/metricd/pb"
 )
 
 var MUX_CHANNEL_BUFFER_SIZE = MAIN_CHANNEL_BUFFER_SIZE

@@ -5,9 +5,9 @@ import (
 	"io"
 	"net"
 
+	"github.com/fluxio/logging"
 	"github.com/fluxio/metricd"
 	"github.com/fluxio/metricd/pb"
-	"github.com/fluxio/logging"
 
 	"google.golang.org/grpc"
 )

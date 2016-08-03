@@ -20,7 +20,7 @@ import (
 const metricsBufferSize = 10000
 const shutdownTimeout = 10 * time.Second
 
-const connectionTimeout = 5 * time.Second
+const connectionTimeout = 10 * time.Second
 
 // Metric queue length considered "normal".
 // Past that size a warning message is logged.
@@ -63,6 +63,7 @@ type Client interface {
 
 type realClient struct {
 	addr             *url.URL
+	addrGetter       func() *url.URL
 	conn             *grpc.ClientConn
 	client           pb.ServerClient
 	stream           pb.Server_ReportClient
@@ -76,8 +77,18 @@ func (c *realClient) tryConnect() error {
 	if c.conn != nil && c.conn.State() != grpc.Shutdown {
 		c.conn.Close()
 	}
+	if c.addrGetter != nil {
+		c.addr = c.addrGetter()
+	}
+	if c.addr == nil {
+		return fmt.Errorf("No server address is available.")
+	}
 	var err error
-	c.conn, err = grpc.Dial(c.addr.Host, grpc.WithInsecure(), grpc.WithBlock())
+	c.conn, err = grpc.Dial(
+		c.addr.Host,
+		grpc.WithInsecure(),
+		grpc.WithBlock(),
+		grpc.WithTimeout(connectionTimeout))
 	if err != nil {
 		return fmt.Errorf("Error creating grpc connection: %s.", err)
 	}
@@ -89,11 +100,12 @@ func (c *realClient) tryConnect() error {
 	return nil
 }
 
-func (c *realClient) init(addr *url.URL) {
+func (c *realClient) init(addr *url.URL, addrGetter func() *url.URL) {
 	c.metrics = make(chan pb.Metric, metricsBufferSize)
 	c.shutdownComplete = make(chan bool)
 
 	c.addr = addr
+	c.addrGetter = addrGetter
 }
 
 // Has to be called before the client is to be destroyed.
@@ -271,9 +283,9 @@ func newNopClient() Client {
 	return &nopClient{}
 }
 
-func newRealClient(addr *url.URL) (Client, error) {
+func newRealClient(addr *url.URL, addrGetter func() *url.URL) (Client, error) {
 	c := &realClient{}
-	c.init(addr)
+	c.init(addr, addrGetter)
 	go c.run()
 	return c, nil
 }
@@ -287,7 +299,22 @@ func NewClient(addr *url.URL) (Client, error) {
 		return newNopClient(), nil
 	}
 	logging.Infof("Using metricd at: %s", addr.Host)
-	return newRealClient(addr)
+	return newRealClient(addr, nil)
+}
+
+// NewClientWithAddrGetter returns a real client that calls addrGetter
+// function to determine the URL address to connect (and reconnect) to.
+func NewClientWithAddrGetter(addrGetter func() *url.URL) (Client, error) {
+	if addrGetter == nil {
+		return nil, fmt.Errorf("No address getting function was provided.")
+	}
+	addr := addrGetter()
+	if addr == nil || addr.Host == "" {
+		logging.Infof("Waiting for metricd server to arrive...")
+	} else {
+		logging.Infof("Using metricd at: %s", addr.Host)
+	}
+	return newRealClient(addr, addrGetter)
 }
 
 func NopClientOnError(c Client, err error) Client {
