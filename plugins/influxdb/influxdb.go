@@ -112,9 +112,15 @@ func (w *influxdbWorker) run() {
 }
 
 func buildPoint(m *pb.Metric) client.Point {
+	validLabels := make(map[string]string)
+	for k, v := range m.Labels {
+		if v != "" && k != "" {
+			validLabels[k] = v
+		}
+	}
 	return client.Point{
 		Measurement: m.Name,
-		Tags:        m.Labels,
+		Tags:        validLabels,
 		Fields: map[string]interface{}{
 			"value": m.ValueAsFloat(),
 		},

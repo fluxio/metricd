@@ -73,3 +73,42 @@ func TestInfluxdbPlugin(t *testing.T) {
 			numPoints, timeout.String(), atomic.LoadInt32(&countedPoints))
 	}
 }
+
+func TestEmptyLabelFiltering(t *testing.T) {
+	labels := make(map[string]string)
+	labels["empty"] = ""
+	labels["nonempty"] = "hello"
+	labels[""] = "empty"
+	labels["spaces"] = "with spaces"
+	labels["check"] = ""
+	m := &pb.Metric{
+		Name: "testing123",
+		Ts:   time.Now().UTC().UnixNano(),
+		Value: &pb.Metric_DoubleValue{
+			DoubleValue: 1234,
+		},
+		Labels: labels,
+	}
+	point := buildPoint(m)
+	_, ok := point.Tags["empty"]
+	if ok {
+		t.Error("Empty tag should not be here")
+	}
+	_, ok = point.Tags["check"]
+	if ok {
+		t.Error("Check tag should not be here")
+	}
+	_, ok = point.Tags[""]
+	if ok {
+		t.Error("Blank tag should not be here")
+	}
+	_, ok = point.Tags["nonempty"]
+	if !ok {
+		t.Error("Non-empty tag should remain in point")
+	}
+	_, ok = point.Tags["spaces"]
+	if !ok {
+		t.Error("Tags with spaces should remain in point")
+	}
+
+}
