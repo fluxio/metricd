@@ -56,6 +56,11 @@ type Client interface {
 	// The reported values are recorded in a histogram over a set period.
 	ReportHistogram(name string, labels LabelSet, value interface{}) error
 
+	// Reports a value every interval. Calls valueGetter to fetch the latest
+	// value.
+	ReportPeriodic(name string, interval time.Duration, labels LabelSet,
+		valueGetter func() interface{}) (PeriodicReporter, error)
+
 	// Returns a timer instance, which can be used for reporting time
 	// length metrics.
 	Timer(name string, labels LabelSet) Timer
@@ -204,6 +209,15 @@ func (c *realClient) Timer(name string, labels LabelSet) Timer {
 	}
 }
 
+func (c *realClient) ReportPeriodic(
+	name string,
+	interval time.Duration,
+	labels LabelSet,
+	valueGetter func() interface{},
+) (PeriodicReporter, error) {
+	return newPeriodicReporter(c, name, interval, labels, valueGetter)
+}
+
 func (c *realClient) reconnectWithExpBackoff() {
 	wait := 20 * time.Millisecond
 	for err := c.tryConnect(); err != nil; err = c.tryConnect() {
@@ -278,6 +292,11 @@ func (nopClient) ReportHistogram(
 	return nil
 }
 func (*nopClient) Timer(string, LabelSet) Timer { return NopTimer{} }
+func (*nopClient) ReportPeriodic(string, time.Duration, LabelSet, func() interface{}) (
+	PeriodicReporter, error,
+) {
+	return nopPeriodicReporter{}, nil
+}
 
 func newNopClient() Client {
 	return &nopClient{}
