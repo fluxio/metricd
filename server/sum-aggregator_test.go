@@ -3,7 +3,6 @@ package server
 import (
 	"testing"
 
-	"github.com/fluxio/metricd"
 	"github.com/fluxio/metricd/pb"
 )
 
@@ -41,7 +40,7 @@ func assertMetricsLen(t *testing.T, metrics []*pb.Metric, length int) {
 func TestSumAggregator(t *testing.T) {
 	const metricName = "test_metric"
 
-	sa := NewSumAggregator(metricName, metricd.LabelSet{})
+	sa := NewSumAggregator(metricName, nil, nil)
 	if sa == nil {
 		t.Fatal("NewSumAggregator returned nil")
 	}

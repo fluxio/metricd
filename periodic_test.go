@@ -24,7 +24,7 @@ func (mc *mockClient) Report(name string, labels LabelSet, value interface{}) er
 
 func TestPeriodicReporter(t *testing.T) {
 	const metricName = "testMetric"
-	labels := map[string]string{
+	labels := LabelSet{
 		"label1": "one",
 		"label2": "two",
 	}
@@ -67,7 +67,7 @@ func TestPeriodicReporter(t *testing.T) {
 		if !reflect.DeepEqual(cli.lastValue, i+1) {
 			t.Errorf("Expected value of %d, got %v", i+1, cli.lastValue)
 		}
-		if !reflect.DeepEqual(cli.lastLabels, LabelSet(labels)) {
+		if !reflect.DeepEqual(cli.lastLabels, labels) {
 			t.Errorf("Expected labels of %v, got %v", labels, cli.lastLabels)
 		}
 		if metricName != cli.lastName {

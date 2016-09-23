@@ -157,13 +157,13 @@ func buildGraphiteName(m *pb.Metric) string {
 	res := m.Name
 
 	var keys []string
-	for k := range m.Labels {
+	for k := range m.IndexedLabels {
 		keys = append(keys, k)
 	}
 
 	sort.Strings(keys)
 	for _, k := range keys {
-		res += "." + k + "." + replaceDisallowedChars(m.Labels[k])
+		res += "." + k + "." + replaceDisallowedChars(m.IndexedLabels[k])
 	}
 
 	return res

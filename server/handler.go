@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/fluxio/logging"
-	"github.com/fluxio/metricd"
 	"github.com/fluxio/metricd/pb"
 
 	"google.golang.org/grpc"
@@ -35,8 +34,9 @@ func (m *metricHandler) Report(stream pb.Server_ReportServer) error {
 			continue
 		}
 
-		if v.Labels == nil {
-			v.Labels = metricd.LabelSet{}
+		if v.IndexedLabels == nil {
+			// Apparently some plugins expect this to be non-nil
+			v.IndexedLabels = map[string]string{}
 		}
 
 		select {

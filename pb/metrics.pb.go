@@ -57,10 +57,12 @@ func (m *Error) String() string { return proto.CompactTextString(m) }
 func (*Error) ProtoMessage()    {}
 
 type Metric struct {
-	Name         string            `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Labels       map[string]string `protobuf:"bytes,2,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Ts           int64             `protobuf:"varint,3,opt,name=ts" json:"ts,omitempty"`
-	Aggregations []Agg             `protobuf:"varint,4,rep,name=aggregations,enum=pb.Agg" json:"aggregations,omitempty"`
+	Name            string            `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	IndexedLabels   map[string]string `protobuf:"bytes,2,rep,name=indexed_labels" json:"indexed_labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	UnindexedLabels map[string]string `protobuf:"bytes,5,rep,name=unindexed_labels" json:"unindexed_labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Timestamp in nanoseconds since 1970
+	Ts           int64 `protobuf:"varint,3,opt,name=ts" json:"ts,omitempty"`
+	Aggregations []Agg `protobuf:"varint,4,rep,name=aggregations,enum=pb.Agg" json:"aggregations,omitempty"`
 	// Types that are valid to be assigned to Value:
 	//	*Metric_IntValue
 	//	*Metric_DoubleValue
@@ -97,9 +99,16 @@ func (m *Metric) GetValue() isMetric_Value {
 	return nil
 }
 
-func (m *Metric) GetLabels() map[string]string {
+func (m *Metric) GetIndexedLabels() map[string]string {
 	if m != nil {
-		return m.Labels
+		return m.IndexedLabels
+	}
+	return nil
+}
+
+func (m *Metric) GetUnindexedLabels() map[string]string {
+	if m != nil {
+		return m.UnindexedLabels
 	}
 	return nil
 }

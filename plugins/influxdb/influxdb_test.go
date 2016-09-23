@@ -87,7 +87,7 @@ func TestEmptyLabelFiltering(t *testing.T) {
 		Value: &pb.Metric_DoubleValue{
 			DoubleValue: 1234,
 		},
-		Labels: labels,
+		IndexedLabels: labels,
 	}
 	point := buildPoint(m)
 	_, ok := point.Tags["empty"]

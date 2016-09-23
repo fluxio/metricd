@@ -1,13 +1,12 @@
 package server
 
 import (
+	"math"
+	"sort"
 	"time"
 
-	"github.com/fluxio/metricd"
 	"github.com/fluxio/metricd/pb"
 	"github.com/streamrail/concurrent-map"
-
-	"math"
 )
 
 // Each metric may optionally specify one or more aggregations to be applied to
@@ -67,11 +66,27 @@ type aggregatorUnit interface {
 	GetAggregations() []*pb.Metric
 }
 
-func stateKey(n string, l metricd.LabelSet) string {
+func stateKey(n string, indexedKeys, unindexedKeys map[string]string) string {
 	res := n
-	for k, v := range l {
-		res += "!" + k + "!" + v
+
+	appendSorted := func(m map[string]string) {
+		var keys []string
+		for k := range m {
+			keys = append(keys, k)
+		}
+		// golang map iteration is in random order and we need a consistent order
+		sort.Strings(keys)
+		for _, k := range keys {
+			res += "!" + k + "!" + m[k]
+		}
 	}
+
+	appendSorted(indexedKeys)
+	if len(unindexedKeys) > 0 {
+		res += "&unindexed"
+		appendSorted(unindexedKeys)
+	}
+
 	return res
 }
 
@@ -96,12 +111,12 @@ func (a *aggregator) process(m *pb.Metric) []*pb.Metric {
 
 		val := m.ValueAsFloat()
 		if !math.IsNaN(val) {
-			p := stateKey(m.Name, m.Labels)
+			p := stateKey(m.Name, m.IndexedLabels, m.UnindexedLabels)
 			u, exists := a.state.Get(p)
 
 			if agg == pb.Agg_HIST {
 				if !exists {
-					u = NewHistAggregator(m.Name, m.Labels)
+					u = NewHistAggregator(m.Name, m.IndexedLabels, m.UnindexedLabels)
 					a.state.Set(p, u)
 				}
 				u.(aggregatorUnit).AddValue(val, m.Ts)
@@ -109,7 +124,7 @@ func (a *aggregator) process(m *pb.Metric) []*pb.Metric {
 
 			if agg == pb.Agg_SUM {
 				if !exists {
-					u = NewSumAggregator(m.Name, m.Labels)
+					u = NewSumAggregator(m.Name, m.IndexedLabels, m.UnindexedLabels)
 					a.state.Set(p, u)
 				}
 				u.(aggregatorUnit).AddValue(val, m.Ts)

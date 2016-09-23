@@ -5,6 +5,13 @@
 // example), Protobuf compiler would generate RPC-layer code for the server and
 // a client (see server.go and client.go). In addition the data serializer and
 // de-serializer are generated (ttypes.go).
+//
+// To generate metrics.pb.go, ensure you have the protobuf compiler installed as well
+// as the protobuf golang support:
+//    https://github.com/google/protobuf
+//    https://github.com/golang/protobuf
+// and run the following:
+//    protoc --go_out=plugins=grpc:. metrics.proto
 
 syntax = "proto3";
 
@@ -21,7 +28,8 @@ enum Agg {
 
 message Metric {
   string name = 1;
-  map<string, string> labels = 2;
+  map<string, string> indexed_labels = 2;
+  map<string, string> unindexed_labels = 5;
   // Timestamp in nanoseconds since 1970
   int64 ts = 3;
   repeated Agg aggregations = 4;

@@ -152,7 +152,7 @@ func getBase64UniqueId() string {
 }
 
 func (r *reporter) record(m *pb.Metric) *pb.Metric {
-	uid := m.Labels["id"]
+	uid := m.IndexedLabels["id"]
 	if uid == "" {
 		logging.Info("Gotten a useractivity metric with no user id.")
 		return m
@@ -194,10 +194,10 @@ func (r *reporter) record(m *pb.Metric) *pb.Metric {
 		s.lastAct = now
 
 		s.activityCount++
-		s.activities[m.Labels["type"]] = true
-		s.clients[m.Labels["clientType"]] = true
+		s.activities[m.IndexedLabels["type"]] = true
+		s.clients[m.IndexedLabels["clientType"]] = true
 
-		if prjid, ok := m.Labels["prj"]; ok {
+		if prjid, ok := m.IndexedLabels["prj"]; ok {
 			s.projects[prjid] = true
 		}
 
@@ -207,7 +207,7 @@ func (r *reporter) record(m *pb.Metric) *pb.Metric {
 
 	r.sessions.Set(uid, s)
 
-	m.Labels["sessionId"] = sid
+	m.IndexedLabels["sessionId"] = sid
 
 	return m
 }

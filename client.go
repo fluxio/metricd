@@ -29,8 +29,12 @@ const normalQueueSize = 100
 // How often to inspect the queue length.
 const reportPeriod = int64(1000)
 
-// Labelset represents a set of metric labels.
-type LabelSet map[string]string
+// LabelSet represents a set of metric labels.
+// Currently the supported value types are:
+//    string - the label value will be indexed in the metric database
+//    Unindexed - the label value will not be indexed
+type LabelSet map[string]interface{}
+type Unindexed string
 
 // Client provides a mechanism to submit metrics to metricd.
 // A metric is identified by a name and by a set of labels (string pairs),
@@ -157,11 +161,26 @@ func (c *realClient) submit(
 	value interface{},
 	agg []pb.Agg,
 ) error {
+	// Split up our label types
+	indexedLabels := make(map[string]string)
+	unindexedLabels := make(map[string]string)
+	for name, val := range labels {
+		switch v := val.(type) {
+		case string:
+			indexedLabels[name] = v
+		case Unindexed:
+			unindexedLabels[name] = string(v)
+		default:
+			return fmt.Errorf("Unsupported type %T on label %s", v, name)
+		}
+	}
+
 	m := pb.Metric{
-		Name:         name,
-		Labels:       labels,
-		Ts:           time.Now().UTC().UnixNano(),
-		Aggregations: agg}
+		Name:            name,
+		IndexedLabels:   indexedLabels,
+		UnindexedLabels: unindexedLabels,
+		Ts:              time.Now().UTC().UnixNano(),
+		Aggregations:    agg}
 
 	switch v := value.(type) {
 	case int:

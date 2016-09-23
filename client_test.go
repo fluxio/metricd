@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/fluxio/metricd/pb"
 	"google.golang.org/grpc"
 )
 
@@ -152,5 +154,105 @@ func TestClientWithAddressGetter(t *testing.T) {
 	// be okay in practice.
 	if rc.conn.State() != grpc.Ready {
 		t.Errorf("Unexpected grpc state. Expected READY, got %s", rc.conn.State())
+	}
+}
+
+func TestSubmit(t *testing.T) {
+	type testCase struct {
+		// Inputs
+		name   string
+		labels LabelSet
+		value  interface{}
+		agg    []pb.Agg
+
+		// Expected output
+		expected pb.Metric
+	}
+
+	testCases := []testCase{
+		{
+			name:  "nolabel",
+			value: float64(123),
+			expected: pb.Metric{
+				Name:            "nolabel",
+				Value:           &pb.Metric_DoubleValue{float64(123)},
+				IndexedLabels:   map[string]string{},
+				UnindexedLabels: map[string]string{},
+			},
+		},
+		{
+			name:  "indexedLabels",
+			value: float64(456),
+			labels: LabelSet{
+				"label1idx": "val1",
+				"label2idx": "val2",
+			},
+			expected: pb.Metric{
+				Name:  "indexedLabels",
+				Value: &pb.Metric_DoubleValue{float64(456)},
+				IndexedLabels: map[string]string{
+					"label1idx": "val1",
+					"label2idx": "val2",
+				},
+				UnindexedLabels: map[string]string{},
+			},
+		},
+		{
+			name:  "unindexedLabels",
+			value: float64(789),
+			labels: LabelSet{
+				"label1uidx": Unindexed("val1"),
+				"label2uidx": Unindexed("val2"),
+			},
+			expected: pb.Metric{
+				Name:          "unindexedLabels",
+				Value:         &pb.Metric_DoubleValue{float64(789)},
+				IndexedLabels: map[string]string{},
+				UnindexedLabels: map[string]string{
+					"label1uidx": "val1",
+					"label2uidx": "val2",
+				},
+			},
+		},
+		{
+			name:  "bothKinds",
+			value: float64(1111),
+			labels: LabelSet{
+				"label1uidx": Unindexed("val1"),
+				"label2idx":  "val2",
+				"label3idx":  "val3",
+				"label4uidx": Unindexed("val4"),
+			},
+			expected: pb.Metric{
+				Name:  "bothKinds",
+				Value: &pb.Metric_DoubleValue{float64(1111)},
+				IndexedLabels: map[string]string{
+					"label2idx": "val2",
+					"label3idx": "val3",
+				},
+				UnindexedLabels: map[string]string{
+					"label1uidx": "val1",
+					"label4uidx": "val4",
+				},
+			},
+		},
+	}
+
+	// We just need a client with a metric channel
+	cli := realClient{metrics: make(chan pb.Metric, 1)}
+
+	for i, tc := range testCases {
+		cli.submit(tc.name, tc.labels, tc.value, tc.agg)
+		select {
+		case result := <-cli.metrics:
+			// Time stamps won't match so zero them out
+			tc.expected.Ts = 0
+			result.Ts = 0
+			if !reflect.DeepEqual(tc.expected, result) {
+				t.Errorf("Test case %d: expected %#v, received %#v", i, tc.expected, result)
+			}
+		default:
+			t.Errorf("Test case %d: no result generated", i)
+		}
 	}
 }

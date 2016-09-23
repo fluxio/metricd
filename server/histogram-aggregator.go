@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/codahale/hdrhistogram"
-	"github.com/fluxio/metricd"
 	"github.com/fluxio/metricd/pb"
 )
 
@@ -18,8 +17,9 @@ const HIGHEST_VALUE = 1e7
 const DIGITS_OF_PRECISION = 2
 
 type histAggregator struct {
-	name   string
-	labels metricd.LabelSet
+	name            string
+	indexedLabels   map[string]string
+	unindexedLabels map[string]string
 	// usec.
 	// Initialized lazily in AddValue().
 	h *hdrhistogram.Histogram
@@ -51,10 +51,11 @@ func (a *histAggregator) GetAggregations() []*pb.Metric {
 	if a.h != nil && a.h.TotalCount() != 0 {
 		for _, q := range []float64{0, 50, 90, 95, 99, 100} {
 			res = append(res, &pb.Metric{
-				Name:   a.name + "_p" + strconv.Itoa(int(q)),
-				Labels: a.labels,
-				Value:  &pb.Metric_DoubleValue{float64(a.h.ValueAtQuantile(q))},
-				Ts:     time.Now().UnixNano(),
+				Name:            a.name + "_p" + strconv.Itoa(int(q)),
+				IndexedLabels:   a.indexedLabels,
+				UnindexedLabels: a.unindexedLabels,
+				Value:           &pb.Metric_DoubleValue{float64(a.h.ValueAtQuantile(q))},
+				Ts:              time.Now().UnixNano(),
 			})
 		}
 		// No point of keeping an empty histogram around, it can be large.
@@ -63,9 +64,10 @@ func (a *histAggregator) GetAggregations() []*pb.Metric {
 	return res
 }
 
-func NewHistAggregator(name string, labels metricd.LabelSet) aggregatorUnit {
+func NewHistAggregator(name string, indexedLabels, unindexedLabels map[string]string) aggregatorUnit {
 	return &histAggregator{
-		name:   name,
-		labels: labels,
+		name:            name,
+		indexedLabels:   indexedLabels,
+		unindexedLabels: unindexedLabels,
 	}
 }
