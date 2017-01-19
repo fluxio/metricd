@@ -83,7 +83,7 @@ type realClient struct {
 
 func (c *realClient) tryConnect() error {
 	// Close possibly existing connection.
-	if c.conn != nil && c.conn.State() != grpc.Shutdown {
+	if c.conn != nil {
 		c.conn.Close()
 	}
 	if c.addrGetter != nil {

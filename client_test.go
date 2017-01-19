@@ -64,14 +64,6 @@ func TestClientConnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// NOTE: Technically this is racy, as the connection could have left the
-	// Ready state by the time we get here. But given that we're looking at this
-	// directly after connecting and we're on the loopback interface, this should
-	// be okay in practice.
-	if rc.conn.State() != grpc.Ready {
-		t.Errorf("Unexpected grpc state. Expected READY, got %s", rc.conn.State())
-	}
 }
 
 func TestClientWithAddressGetter(t *testing.T) {
@@ -146,14 +138,6 @@ func TestClientWithAddressGetter(t *testing.T) {
 	err = rc.tryConnect()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// NOTE: Technically this is racy, as the connection could have left the
-	// Ready state by the time we get here. But given that we're looking at this
-	// directly after connecting and we're on the loopback interface, this should
-	// be okay in practice.
-	if rc.conn.State() != grpc.Ready {
-		t.Errorf("Unexpected grpc state. Expected READY, got %s", rc.conn.State())
 	}
 }
 
