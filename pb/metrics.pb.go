@@ -28,6 +28,12 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+
 type Agg int32
 
 const (
@@ -47,22 +53,31 @@ var Agg_value = map[string]int32{
 func (x Agg) String() string {
 	return proto.EnumName(Agg_name, int32(x))
 }
+func (Agg) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 type Error struct {
 	Message string `protobuf:"bytes,1,opt,name=message" json:"message,omitempty"`
 }
 
-func (m *Error) Reset()         { *m = Error{} }
-func (m *Error) String() string { return proto.CompactTextString(m) }
-func (*Error) ProtoMessage()    {}
+func (m *Error) Reset()                    { *m = Error{} }
+func (m *Error) String() string            { return proto.CompactTextString(m) }
+func (*Error) ProtoMessage()               {}
+func (*Error) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+func (m *Error) GetMessage() string {
+	if m != nil {
+		return m.Message
+	}
+	return ""
+}
 
 type Metric struct {
 	Name            string            `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	IndexedLabels   map[string]string `protobuf:"bytes,2,rep,name=indexed_labels" json:"indexed_labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	UnindexedLabels map[string]string `protobuf:"bytes,5,rep,name=unindexed_labels" json:"unindexed_labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	IndexedLabels   map[string]string `protobuf:"bytes,2,rep,name=indexed_labels,json=indexedLabels" json:"indexed_labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	UnindexedLabels map[string]string `protobuf:"bytes,5,rep,name=unindexed_labels,json=unindexedLabels" json:"unindexed_labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Timestamp in nanoseconds since 1970
 	Ts           int64 `protobuf:"varint,3,opt,name=ts" json:"ts,omitempty"`
-	Aggregations []Agg `protobuf:"varint,4,rep,name=aggregations,enum=pb.Agg" json:"aggregations,omitempty"`
+	Aggregations []Agg `protobuf:"varint,4,rep,packed,name=aggregations,enum=pb.Agg" json:"aggregations,omitempty"`
 	// Types that are valid to be assigned to Value:
 	//	*Metric_IntValue
 	//	*Metric_DoubleValue
@@ -70,22 +85,23 @@ type Metric struct {
 	Value isMetric_Value `protobuf_oneof:"Value"`
 }
 
-func (m *Metric) Reset()         { *m = Metric{} }
-func (m *Metric) String() string { return proto.CompactTextString(m) }
-func (*Metric) ProtoMessage()    {}
+func (m *Metric) Reset()                    { *m = Metric{} }
+func (m *Metric) String() string            { return proto.CompactTextString(m) }
+func (*Metric) ProtoMessage()               {}
+func (*Metric) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
 type isMetric_Value interface {
 	isMetric_Value()
 }
 
 type Metric_IntValue struct {
-	IntValue int64 `protobuf:"varint,10,opt,name=int_value,oneof"`
+	IntValue int64 `protobuf:"varint,10,opt,name=int_value,json=intValue,oneof"`
 }
 type Metric_DoubleValue struct {
-	DoubleValue float64 `protobuf:"fixed64,11,opt,name=double_value,oneof"`
+	DoubleValue float64 `protobuf:"fixed64,11,opt,name=double_value,json=doubleValue,oneof"`
 }
 type Metric_StringValue struct {
-	StringValue string `protobuf:"bytes,12,opt,name=string_value,oneof"`
+	StringValue string `protobuf:"bytes,12,opt,name=string_value,json=stringValue,oneof"`
 }
 
 func (*Metric_IntValue) isMetric_Value()    {}
@@ -99,6 +115,13 @@ func (m *Metric) GetValue() isMetric_Value {
 	return nil
 }
 
+func (m *Metric) GetName() string {
+	if m != nil {
+		return m.Name
+	}
+	return ""
+}
+
 func (m *Metric) GetIndexedLabels() map[string]string {
 	if m != nil {
 		return m.IndexedLabels
@@ -109,6 +132,20 @@ func (m *Metric) GetIndexedLabels() map[string]string {
 func (m *Metric) GetUnindexedLabels() map[string]string {
 	if m != nil {
 		return m.UnindexedLabels
+	}
+	return nil
+}
+
+func (m *Metric) GetTs() int64 {
+	if m != nil {
+		return m.Ts
+	}
+	return 0
+}
+
+func (m *Metric) GetAggregations() []Agg {
+	if m != nil {
+		return m.Aggregations
 	}
 	return nil
 }
@@ -135,8 +172,8 @@ func (m *Metric) GetStringValue() string {
 }
 
 // XXX_OneofFuncs is for the internal use of the proto package.
-func (*Metric) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), []interface{}) {
-	return _Metric_OneofMarshaler, _Metric_OneofUnmarshaler, []interface{}{
+func (*Metric) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _Metric_OneofMarshaler, _Metric_OneofUnmarshaler, _Metric_OneofSizer, []interface{}{
 		(*Metric_IntValue)(nil),
 		(*Metric_DoubleValue)(nil),
 		(*Metric_StringValue)(nil),
@@ -192,6 +229,27 @@ func _Metric_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer)
 	}
 }
 
+func _Metric_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*Metric)
+	// Value
+	switch x := m.Value.(type) {
+	case *Metric_IntValue:
+		n += proto.SizeVarint(10<<3 | proto.WireVarint)
+		n += proto.SizeVarint(uint64(x.IntValue))
+	case *Metric_DoubleValue:
+		n += proto.SizeVarint(11<<3 | proto.WireFixed64)
+		n += 8
+	case *Metric_StringValue:
+		n += proto.SizeVarint(12<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(len(x.StringValue)))
+		n += len(x.StringValue)
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
+
 func init() {
 	proto.RegisterType((*Error)(nil), "pb.Error")
 	proto.RegisterType((*Metric)(nil), "pb.Metric")
@@ -201,6 +259,10 @@ func init() {
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
 var _ grpc.ClientConn
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Server service
 
@@ -295,4 +357,35 @@ var _Server_serviceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
+	Metadata: "metrics.proto",
+}
+
+func init() { proto.RegisterFile("metrics.proto", fileDescriptor0) }
+
+var fileDescriptor0 = []byte{
+	// 373 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x92, 0xc1, 0xab, 0xd3, 0x40,
+	0x10, 0xc6, 0xb3, 0xd9, 0x26, 0x79, 0x9d, 0xf6, 0xd5, 0x30, 0xbc, 0x43, 0x28, 0x3c, 0x8c, 0x15,
+	0x21, 0x28, 0x44, 0xa9, 0x17, 0xf1, 0xe4, 0x7b, 0x58, 0x68, 0xc5, 0x5e, 0x52, 0xeb, 0xb5, 0x24,
+	0x76, 0x59, 0x16, 0xd3, 0x4d, 0xd8, 0xdd, 0x14, 0xfb, 0xf7, 0xfa, 0x8f, 0x48, 0x36, 0xad, 0xb6,
+	0xd6, 0x8b, 0xb7, 0x99, 0x6f, 0xbe, 0xf9, 0xb1, 0x7c, 0x3b, 0x70, 0xbb, 0x63, 0x46, 0x89, 0x6f,
+	0x3a, 0xad, 0x55, 0x65, 0x2a, 0x74, 0xeb, 0x62, 0xf2, 0x0c, 0xbc, 0x99, 0x52, 0x95, 0xc2, 0x08,
+	0x82, 0x1d, 0xd3, 0x3a, 0xe7, 0x2c, 0x22, 0x31, 0x49, 0xfa, 0xd9, 0xa9, 0x9d, 0xfc, 0xa4, 0xe0,
+	0x2f, 0xed, 0x22, 0x22, 0xf4, 0x64, 0xbe, 0x3b, 0x39, 0x6c, 0x8d, 0x1f, 0x61, 0x24, 0xe4, 0x96,
+	0xfd, 0x60, 0xdb, 0x4d, 0x99, 0x17, 0xac, 0xd4, 0x91, 0x1b, 0xd3, 0x64, 0x30, 0xbd, 0x4f, 0xeb,
+	0x22, 0xed, 0xf6, 0xd2, 0x45, 0x67, 0xf8, 0x6c, 0xe7, 0x33, 0x69, 0xd4, 0x21, 0xbb, 0x15, 0xe7,
+	0x1a, 0x7e, 0x82, 0xb0, 0x91, 0x7f, 0x71, 0x3c, 0xcb, 0x79, 0x7a, 0xc6, 0x59, 0x4b, 0x71, 0x4d,
+	0x7a, 0xd2, 0x5c, 0xaa, 0x38, 0x02, 0xd7, 0xe8, 0x88, 0xc6, 0x24, 0xa1, 0x99, 0x6b, 0x34, 0xbe,
+	0x82, 0x61, 0xce, 0xb9, 0x62, 0x3c, 0x37, 0xa2, 0x92, 0x3a, 0xea, 0xc5, 0x34, 0x19, 0x4d, 0x83,
+	0x96, 0xfb, 0xc0, 0x79, 0x76, 0x31, 0xc4, 0x7b, 0xe8, 0x0b, 0x69, 0x36, 0xfb, 0xbc, 0x6c, 0x58,
+	0x04, 0x2d, 0x63, 0xee, 0x64, 0x37, 0x42, 0x9a, 0xaf, 0xad, 0x82, 0xcf, 0x61, 0xb8, 0xad, 0x9a,
+	0xa2, 0x64, 0x47, 0xc7, 0x20, 0x26, 0x09, 0x99, 0x3b, 0xd9, 0xa0, 0x53, 0x7f, 0x9b, 0xb4, 0x51,
+	0x42, 0xf2, 0xa3, 0x69, 0xd8, 0xc6, 0xd5, 0x9a, 0x3a, 0xd5, 0x9a, 0xc6, 0x1f, 0x00, 0xaf, 0x63,
+	0xc1, 0x10, 0xe8, 0x77, 0x76, 0x38, 0x06, 0xdc, 0x96, 0x78, 0x07, 0x5e, 0x47, 0x71, 0xad, 0xd6,
+	0x35, 0xef, 0xdd, 0x77, 0x64, 0xfc, 0x08, 0x77, 0xff, 0x0a, 0xe4, 0x7f, 0x18, 0x8f, 0x01, 0x78,
+	0xf6, 0x39, 0x2f, 0x23, 0xa0, 0x0f, 0x9c, 0x63, 0x00, 0x74, 0xb5, 0x5e, 0x86, 0x0e, 0xde, 0x40,
+	0x6f, 0xbe, 0x58, 0x7d, 0x09, 0xc9, 0xf4, 0x35, 0xf8, 0x2b, 0xa6, 0xf6, 0x4c, 0xe1, 0x0b, 0xf0,
+	0x33, 0x56, 0x57, 0xca, 0x20, 0xfc, 0xf9, 0x94, 0x71, 0xbf, 0xad, 0xed, 0x11, 0x4d, 0x9c, 0x84,
+	0xbc, 0x21, 0x85, 0x6f, 0xcf, 0xeb, 0xed, 0xaf, 0x00, 0x00, 0x00, 0xff, 0xff, 0x69, 0xf6, 0x09,
+	0xd3, 0x6f, 0x02, 0x00, 0x00,
 }
